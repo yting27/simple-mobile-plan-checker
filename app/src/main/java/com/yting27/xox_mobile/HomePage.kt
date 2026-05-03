@@ -201,7 +201,7 @@ fun FunctionalityRegion(
                 Spacer(Modifier.size(8.dp))
                 Text("Request Bal")
             }
-            // Topup internet
+            // Top-up internet
             Button(
                 onClick = { showConfirmDialog = true },
                 modifier = Modifier.weight(1f),
