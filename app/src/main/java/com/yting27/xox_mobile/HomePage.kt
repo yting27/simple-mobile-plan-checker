@@ -42,21 +42,24 @@ import java.util.Date
 import java.util.Locale
 import com.yting27.xox_mobile.controllers.SmsService
 import com.yting27.xox_mobile.models.BalanceData
+import com.yting27.xox_mobile.repositories.BalanceRepository
 import com.yting27.xox_mobile.ui.components.InfoCard
 import com.yting27.xox_mobile.ui.theme.Xox_mobileTheme
 
 
 class HomePage : ComponentActivity() {
-    private var balanceData by mutableStateOf< BalanceData?>(null)
+    private var balanceData by mutableStateOf<BalanceData?>(null)
     private lateinit var smsService: SmsService
+    private lateinit var balanceRepository: BalanceRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        smsService = SmsService(this) { balance ->
+        balanceRepository = BalanceRepository(this)
+        smsService = SmsService(this, balanceRepository) { balance ->
             balanceData = balance
         }
         smsService.registerSmsReceiver()
-        balanceData = smsService.loadBalance()
+        balanceData = balanceRepository.loadBalance()
         setContent {
             Xox_mobileTheme {
                 Scaffold(
@@ -94,7 +97,7 @@ fun CustomTopAppBar() {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "XOX Mobile Query",
+                text = "Mobile Plan Query",
                 style = MaterialTheme.typography.titleLarge
             )
         }
@@ -113,8 +116,8 @@ fun FunctionalityRegion(
     if (showConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showConfirmDialog = false },
-            title = { Text("Confirm Purchase") },
-            text = { Text("Are you sure you want to buy 500MB data for RM5?") },
+            title = { Text("Add Data") },
+            text = { Text("Are you sure you want to add 500MB data?") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -197,7 +200,7 @@ fun FunctionalityRegion(
             ) {
                 Icon(Icons.Default.SystemSecurityUpdate, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(8.dp))
-                Text("Request Bal")
+                Text("Check Balance")
             }
             // Top-up internet
             Button(

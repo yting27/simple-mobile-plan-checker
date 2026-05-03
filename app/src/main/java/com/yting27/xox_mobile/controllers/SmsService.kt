@@ -18,19 +18,42 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.yting27.xox_mobile.models.BalanceData
-import kotlinx.serialization.json.Json
-import org.jetbrains.annotations.Debug
+import com.yting27.xox_mobile.repositories.BalanceRepository
 
 class SmsService(
     private val activity: ComponentActivity,
+    private val balanceRepository: BalanceRepository,
     private val onBalanceReceived: (BalanceData?) -> Unit
 ) {
     companion object {
         private const val XOX_NUM = "22111"
-        private const val SENT_ACTION = "com.example.SMS_SENT"
-        private const val DELIVERED_ACTION = "com.example.SMS_DELIVERED"
-        private const val PREFS_NAME = "XoxPrefs"
-        private const val KEY_BALANCE_JSON = "balance_json"
+        private const val SENT_ACTION = "com.yting27.SMS_SENT"
+        private const val DELIVERED_ACTION = "com.yting27.SMS_DELIVERED"
+
+        internal fun parseSmsBody(body: String): BalanceData? {
+            return try {
+                val da = "DA: RM(\\d+\\.\\d+)".toRegex().find(body)?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
+                val ma = "MA: RM(\\d+\\.\\d+)".toRegex().find(body)?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
+                val totalBalance = da + ma
+                val activeTill = "Active till ([\\d\\/]+)".toRegex().find(body)?.groupValues?.get(1)?.trim() ?: "N/A"
+
+                val dataMatch = "Data: ([^(]+)\\(Exp: ([^)]+)\\)".toRegex().find(body)
+                val dataAmount = dataMatch?.groupValues?.get(1)?.trim() ?: "N/A"
+                val dataExp = dataMatch?.groupValues?.get(2)?.trim() ?: "N/A"
+
+                val seasonPass = "SeasonPass: (.+)".toRegex().find(body)?.groupValues?.get(1)?.trim() ?: "N/A"
+
+                BalanceData(
+                    totalBalance = "RM${"%.2f".format(totalBalance)}",
+                    activeTill = activeTill,
+                    dataAmount = dataAmount,
+                    dataExp = dataExp,
+                    seasonPass = seasonPass
+                )
+            } catch (_: Exception) {
+                null
+            }
+        }
     }
 
     enum class SmsCommand(val code: String) {
@@ -130,7 +153,7 @@ class SmsService(
                         if (sender?.contains(XOX_NUM) == true) {
                             val balance = parseSmsBody(body)
                             if (balance != null) {
-                                saveBalance(balance)
+                                balanceRepository.saveBalance(balance)
                             }
                             onBalanceReceived(balance)
                         }
@@ -145,46 +168,5 @@ class SmsService(
         } else 0
         
         activity.registerReceiver(smsReceiver, filter, flags)
-    }
-
-    private fun parseSmsBody(body: String): BalanceData? {
-        return try {
-            val da = "DA: RM(\\d+\\.\\d+)".toRegex().find(body)?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
-            val ma = "MA: RM(\\d+\\.\\d+)".toRegex().find(body)?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
-            val totalBalance = da + ma
-            val activeTill = "Active till ([\\d\\/]+)".toRegex().find(body)?.groupValues?.get(1)?.trim() ?: "N/A"
-
-            val dataMatch = "Data: ([^(]+)\\(Exp: ([^)]+)\\)".toRegex().find(body)
-            val dataAmount = dataMatch?.groupValues?.get(1)?.trim() ?: "N/A"
-            val dataExp = dataMatch?.groupValues?.get(2)?.trim() ?: "N/A"
-
-            val seasonPass = "SeasonPass: (.+)".toRegex().find(body)?.groupValues?.get(1)?.trim() ?: "N/A"
-
-            BalanceData(
-                totalBalance = "RM${"%.2f".format(totalBalance)}",
-                activeTill = activeTill,
-                dataAmount = dataAmount,
-                dataExp = dataExp,
-                seasonPass = seasonPass
-            )
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    fun saveBalance(balance: BalanceData) {
-        val prefs = activity.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val jsonString = Json.encodeToString(balance)
-        prefs.edit().putString(KEY_BALANCE_JSON, jsonString).apply()
-    }
-
-    fun loadBalance(): BalanceData? {
-        val prefs = activity.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val jsonString = prefs.getString(KEY_BALANCE_JSON, null) ?: return null
-        return try {
-            Json.decodeFromString<BalanceData>(jsonString)
-        } catch (_: Exception) {
-            null
-        }
     }
 }
